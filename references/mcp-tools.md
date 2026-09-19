@@ -6,7 +6,7 @@ All hub tools return JSON objects. Failures use:
 {"ok": false, "code": "PATH_DENIED", "error": "Access denied: path must stay inside the knowledge hub root"}
 ```
 
-Common `code` values: `PATH_DENIED`, `NOT_FOUND`, `TOO_LARGE`, `UNSUPPORTED_TYPE`, `INVALID_QUERY`, `INVALID_PATH`, `INVALID_LIMIT`, `HUB_UNAVAILABLE`.
+Common `code` values: `PATH_DENIED`, `NOT_FOUND`, `TOO_LARGE`, `UNSUPPORTED_TYPE`, `INVALID_QUERY`, `INVALID_PATH`, `INVALID_LIMIT`, `HUB_UNAVAILABLE`, `EMPTY_PDF`, `EXTRACTOR_UNAVAILABLE`.
 
 ## list_hub_files
 
@@ -31,7 +31,7 @@ Common `code` values: `PATH_DENIED`, `NOT_FOUND`, `TOO_LARGE`, `UNSUPPORTED_TYPE
 
 ## get_file_metadata
 
-Includes `is_text` and `readable` (supported text and size ≤ 2 MB).
+Includes `is_text`, `is_pdf`, and `readable` (text or PDF, size ≤ 2 MB).
 
 ## get_latest_files
 
@@ -46,6 +46,19 @@ Includes `is_text` and `readable` (supported text and size ≤ 2 MB).
   "size_bytes": 120,
   "encoding": "utf-8",
   "content": "# Lecture\n..."
+}
+```
+
+PDF example:
+
+```json
+{
+  "ok": true,
+  "path": "files/COMP2022/lecture/slides.pdf",
+  "size_bytes": 1155420,
+  "encoding": "pdf-text",
+  "page_count": 12,
+  "content": "[Page 1]\nStacks are LIFO..."
 }
 ```
 
