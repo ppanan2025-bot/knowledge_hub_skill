@@ -1,11 +1,19 @@
-# Knowledge Hub MCP skill
+# knowledge_hub
 
-Hermes skill for the read-only knowledge hub MCP tools.
+Hermes skill that teaches **when and how** to use the existing Knowledge Hub MCP tools.
 
-Install the skill directory under `~/.hermes/skills/knowledge-hub-mcp/` on the
-Hermes host. The agent should call MCP tools, not the terminal.
+It does not implement MCP tools. The server is Simplest_MCP (`knowledge_hub.py`).
 
-The tool implementation lives in Simplest_MCP (`knowledge_hub.py`). The
-reusable jail/framework lives in the `knowledge_MCP` repo.
+Install directory on the Hermes host:
+
+```
+~/.hermes/skills/productivity/knowledge_hub/
+```
+
+Guest website copy (read-only external dir):
+
+```
+/opt/hermes/guest-skills-ro/productivity/knowledge_hub/
+```
 
 Author: AnPan (ppanan2025-bot)

@@ -1,14 +1,18 @@
 # MCP tool return shapes
 
-All hub tools return JSON objects. Failures use:
+Hub tools return JSON. Failures:
 
 ```json
 {"ok": false, "code": "PATH_DENIED", "error": "Access denied: path must stay inside the knowledge hub root"}
 ```
 
-Common `code` values: `PATH_DENIED`, `NOT_FOUND`, `TOO_LARGE`, `UNSUPPORTED_TYPE`, `INVALID_QUERY`, `INVALID_PATH`, `INVALID_LIMIT`, `HUB_UNAVAILABLE`, `EMPTY_PDF`, `EXTRACTOR_UNAVAILABLE`.
+Codes: `PATH_DENIED`, `NOT_FOUND`, `TOO_LARGE`, `UNSUPPORTED_TYPE`, `INVALID_QUERY`, `INVALID_PATH`, `INVALID_LIMIT`, `HUB_UNAVAILABLE`, `EMPTY_PDF`, `EXTRACTOR_UNAVAILABLE`.
+
+There are no `document_id`, `chunk_id`, or page-range tools.
 
 ## list_hub_files
+
+`path` relative to the hub root (`""` = root). `recursive` default false.
 
 ```json
 {
@@ -31,13 +35,15 @@ Common `code` values: `PATH_DENIED`, `NOT_FOUND`, `TOO_LARGE`, `UNSUPPORTED_TYPE
 
 ## get_file_metadata
 
-Includes `is_text`, `is_pdf`, and `readable` (text or PDF, size ≤ 2 MB).
+Includes `is_text`, `is_pdf`, and `readable` (supported text or PDF, size ≤ 2 MB).
 
 ## get_latest_files
 
-`files` is the same entry shape, newest first. `limit` max 50.
+`files` is the same entry shape, newest first. `limit` max 50. No `is_pdf` field — use the filename suffix.
 
 ## read_hub_file
+
+Text:
 
 ```json
 {
@@ -49,7 +55,7 @@ Includes `is_text`, `is_pdf`, and `readable` (text or PDF, size ≤ 2 MB).
 }
 ```
 
-PDF example:
+PDF (`encoding`: `pdf-text`, pages tagged `[Page N]`, max 40 pages):
 
 ```json
 {
@@ -64,17 +70,21 @@ PDF example:
 
 ## search_hub
 
+Hub-wide. Query 2–200 characters. Filter `matches[].path` yourself if the user named one file.
+
 ```json
 {
   "ok": true,
-  "query": "stack",
+  "query": "BCNF",
   "truncated": false,
   "matches": [
     {
       "path": "files/COMP2022/lecture.md",
       "name": "lecture.md",
-      "snippets": [{"line": 2, "text": "Stacks are LIFO."}]
+      "snippets": [{"line": 2, "text": "BCNF is a normal form..."}]
     }
   ]
 }
 ```
+
+PDF hits may include `"source": "pdf"`.

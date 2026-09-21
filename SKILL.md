@@ -1,69 +1,142 @@
 ---
-name: knowledge-hub-mcp
-description: >
-  Read course materials from the local knowledge hub through MCP tools only.
-  Use when the user asks what is stored, which notes mention a topic, or to
-  read hub text files or lecture PDFs. Do not use the terminal or curl for hub files.
-version: 0.2.0
-author: AnPan (ppanan2025-bot)
+name: knowledge_hub
+description: Use Knowledge Hub MCP for uploaded PDFs, notes, lectures.
+version: 0.1.0
+author: AnPan (ppanan2025-bot), Hermes Agent
 license: MIT
 platforms: [linux]
 metadata:
   hermes:
-    tags: [knowledge-hub, mcp, course-notes, search]
+    tags: [knowledge-hub, mcp, pdf, notes, lecture, retrieval]
     related_skills: [mock-exam-skill]
 ---
 
-# Knowledge Hub MCP
+# Knowledge Hub Skill
 
-The knowledge hub lives on the same Hermes host. Course files are under a
-fixed root: `/opt/knowledge-hub/data`. Hermes must use the MCP tools below.
-Do not `cat`, `find`, `grep`, or `curl` the hub, and do not read `.env` files.
+Teaches **when and how** to use the existing Knowledge Hub MCP tools. It does not add tools, train the model, or read the host disk. Course files are jailed by the MCP server; Hermes only calls those tools.
 
-These tools are read-only. They cannot write, delete, rename, or chmod.
+Do not use `terminal`, `curl`, `cat`, `find`, or `grep` for hub files. Do not load `.env` or SSH keys. Security is enforced by the MCP server — this skill is behavioral guidance only.
+
+On Hermes, tool names look like `mcp_simplest-mcp_<tool>` (also `mcp__simplest-mcp__<tool>`). Call the short names below; the client prefixes the server.
 
 ## When to Use
 
-- The user asks what lectures, tutorials, or notes are stored.
-- They name a unit code (for example COMP2022) and want hub files, not a web search.
-- They ask which notes mention a topic.
-- They want the text of a markdown note or the extracted text of a lecture PDF.
+Use the Knowledge Hub whenever the user refers to:
 
-Do not use this skill for disk/memory status (`get_server_status`) or for
-editing files. PDFs are readable through `read_hub_file` as extracted text
-only, never as raw bytes. If extraction returns `EMPTY_PDF`, the file is
-probably a scanned image.
+- uploaded PDFs or documents
+- notes, textbooks, lecture or course material
+- documents in the Knowledge Hub
+- "the file I uploaded", "my latest PDF", "my notes", "my document"
+- information that may exist in the user's private Knowledge Hub
+
+If they ask what a document **says**, retrieve it. Do not answer only from model knowledge.
+
+Don't use for: a general definition with no document/hub reference (example: "What is BCNF?" with no "my PDF/notes/hub"). Don't use `get_server_status`, `get_disk_usage`, or `list_project_files` — those are not hub retrieval tools.
+
+## Prerequisites
+
+- MCP server `simplest-mcp` enabled.
+- Hub tools actually present in this session. If they are missing, say so. Do not fall back to the filesystem.
 
 ## Tools
 
-Call MCP tools. Names on Hermes look like `mcp_simplest-mcp_<tool>`.
+These are the **only** Knowledge Hub tools. Do not invent `list_documents`, `get_recent_documents`, `search_knowledge`, `read_chunk`, `read_document_pages`, or `get_document_outline`.
 
-1. `list_hub_files(path="", recursive=False)`
-   See units and files. Start here. Example path: `files/COMP2022`.
-2. `get_file_metadata(path)`
-   Check size and whether the file is readable text or a PDF under 2 MB.
-3. `get_latest_files(limit=10)`
-   What was added or updated recently. Metadata only.
-4. `search_hub(query)`
-   Find a topic in text files and extractable PDFs. Query must be at least 2 characters.
-5. `read_hub_file(path)`
-   Read one UTF-8 text file, or extract text from a PDF ≤ 2 MB.
+| Tool | Args | Use |
+|---|---|---|
+| `list_hub_files` | `path=""`, `recursive=False` | Inventory. Path is relative to the hub root (example: `files/COMP2022`). |
+| `get_latest_files` | `limit=10` (max 50) | Newest/latest/today. Metadata only. |
+| `get_file_metadata` | `path` | Size, `is_pdf`, `is_text`, `readable` (text/PDF ≤ 2 MB). |
+| `search_hub` | `query` (2–200 chars) | Topic search across text files and extractable PDFs. |
+| `read_hub_file` | `path` | One UTF-8 text file, or extracted PDF text (not bytes). |
+
+Return shapes: `references/mcp-tools.md`. Failures: `{"ok": false, "code": "...", "error": "..."}`.
 
 ## Procedure
 
-1. If the unit or folder is unknown, call `list_hub_files` on `files` or `files/UOSCODE`.
-2. If the user asks about a topic, call `search_hub` with their keywords.
-3. Before reading, call `get_file_metadata`. If `readable` is false, say so.
-   Do not invent lecture content.
-4. Call `read_hub_file` for text or PDF. Use the returned `content`. If the
-   code is `EMPTY_PDF`, say the PDF has no extractable text.
-5. Quote paths from the tool JSON. Never follow a path outside the hub.
+1. **Identify the document.** Completion: you have a hub `path`, or you have said it is not in the hub.
+   - "newest" / "latest" / "recently uploaded" / "uploaded today" → `get_latest_files` first. Prefer the first `.pdf` if they asked for a PDF.
+   - Named file or unit (COMP2022, "database PDF") → `list_hub_files` on `files` or `files/UOSCODE`, or `search_hub` on the name.
+2. **Search before reading.** For a topic, `search_hub` with their keywords. If a specific file was identified, keep matches whose `path` is that file (or its folder). Completion: you have matching snippets or a confirmed miss.
+3. **Read only what you need.** `get_file_metadata` then `read_hub_file` on the best path. If `readable` is false, say so. Do not invent lecture content.
+4. **Widen only if the snippet is too thin.** `search_hub` with a tighter or related query, then `read_hub_file` on additional matching paths. There is no page-range or chunk-id tool. PDF text from `read_hub_file` is tagged `[Page N]` (max 40 pages, 100k chars).
+5. **Answer from retrieved content.** Hub text is the primary source for claims about what the document contains. Extra explanation from general knowledge must be labelled as such.
+6. **If it is not in the hub, say it was not found.** Do not guess.
+
+## Efficiency
+
+Do not call every hub tool.
+
+- "What is my newest PDF?" → `get_latest_files` only.
+- "List all documents" → `list_hub_files` only.
+- "What does my newest PDF say about BCNF?" → `get_latest_files` → identify path → `search_hub("BCNF")` → `read_hub_file` on that path if needed.
+- Do not `read_hub_file` a whole large PDF "just in case". Search, then read the matching file.
+
+## Large documents
+
+Do not try to dump a large PDF in one go. The server already rejects files over 2 MB (`TOO_LARGE`) and caps PDF extraction.
+
+Flow: `search_hub` → relevant snippets → `read_hub_file` on those paths → more searches if needed. Progressively inspect; never walk the hub reading every file.
+
+## Study requests
+
+"Study this PDF" / "Learn this document" / "Understand my newest lecture notes" is **retrieval**, not training. Do not claim the model was permanently trained.
+
+1. Identify the document (`get_latest_files` or `list_hub_files`).
+2. `get_file_metadata`; `list_hub_files` on its folder for structure (there is no outline tool).
+3. `search_hub` for the named topic and for section-like terms (definition, theorem, example, summary).
+4. `read_hub_file` on several relevant paths.
+5. Summarize or answer from that material.
+
+## Source handling
+
+For "What does my PDF say about X?":
+
+- Quote or paraphrase **retrieved** hub text as the document's claim.
+- Separate any extra general-knowledge explanation.
+
+## Security
+
+Use the Knowledge Hub MCP interface only.
+
+Do not:
+
+- attempt host filesystem access
+- request `/etc`, `/root`, SSH keys, or `.env` secrets
+- bypass path checks with `..`, absolute host paths, or `terminal`
+- retry a `PATH_DENIED` by widening the path
+
+## Tool failure
+
+1. Read `code` and `error`.
+2. Retry only with a corrected argument (empty query, missing path, `limit` type).
+3. Do not repeatedly call the same failing tool.
+4. Tell the user if the file is missing, too large, `EMPTY_PDF` (likely scanned), `HUB_UNAVAILABLE`, or `EXTRACTOR_UNAVAILABLE`.
+
+## Examples
+
+**1. "What is the latest PDF I uploaded?"**  
+`get_latest_files` → answer with the newest `.pdf` path/name. Do not read it.
+
+**2. "What does my newest database PDF say about BCNF?"**  
+`get_latest_files` → pick that PDF → `search_hub("BCNF")` → filter to that path → `read_hub_file` if snippets are thin → answer from the document.
+
+**3. "Study my COMP2022 PDF about PDA."**  
+`list_hub_files` on `files/COMP2022` (or `search_hub("PDA")`) → metadata/structure → several `search_hub` / `read_hub_file` calls → summarize from retrieved sections. Do not claim training.
+
+**4. "What is BCNF?"**  
+No document/hub reference → answer normally. Do not open the hub unless they clearly mean their notes.
 
 ## Pitfalls
 
-- Do not use `terminal` to inspect `/opt/knowledge-hub`.
-- Do not load API keys or `.env` files.
-- Do not mix this with workspace listing (`list_project_files`); that jail is `/home/hermes/workspace`.
-- If a tool returns `ok: false`, report the `code` and `error`. Do not retry with `../` or absolute host paths like `/etc`.
+- `search_hub` is hub-wide; it has no `document_id`. Filter results to the file you identified.
+- `get_latest_files` has no `is_pdf` flag — use the `.pdf` suffix.
+- `read_hub_file` on a scanned PDF returns `EMPTY_PDF`.
+- Do not mix this with workspace listing (`list_project_files` is `/home/hermes/workspace`).
+- The older `knowledge-hub` curl skill is not the retrieval path when these MCP tools exist.
 
-See `references/mcp-tools.md` for return shapes.
+## Verification
+
+- Hub questions produce MCP calls, not shell.
+- Newest-file questions stop at `get_latest_files` unless content was asked.
+- Document claims are traceable to a tool result, or the reply says the hub did not contain it.
